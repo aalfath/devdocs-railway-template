@@ -45,6 +45,19 @@ refresh = refresh_days.positive? && File.exist?(stamp) && File.mtime(stamp) < Ti
 todo = refresh ? (wanted + Docs.installed).uniq : wanted.reject(&installed)
 puts "[devdocs] #{wanted.length} wanted, #{todo.length} to download#{' (monthly refresh)' if refresh}"
 
+require 'open3'
+
+# The published archives are made on macOS and carry extended attributes and
+# AppleDouble (._*) files; Railway volumes can't store those xattrs, so skip them.
+def unpack(archive, target)
+  FileUtils.rm_rf(target)
+  FileUtils.mkdir_p(target)
+  out, status = Open3.capture2e('bsdtar', '-xf', archive, '-C', target, '--no-xattrs', '--no-acls',
+                                '--no-fflags', '--no-same-owner', '--exclude', '._*')
+  return if status.success?
+  raise "bsdtar exited #{status.exitstatus}: #{out.lines.first(3).join.strip}"
+end
+
 failed = 0
 todo.each_with_index do |doc, i|
   label = "#{doc.name}#{" #{doc.version}" if doc.version.present?}"
@@ -53,7 +66,7 @@ todo.each_with_index do |doc, i|
   archive = nil
   begin
     archive = Docs::Archive.download("#{DOWNLOADS_URL}/#{doc.path}.tar.gz")
-    Docs::Archive.unpack(archive, staging)
+    unpack(archive, staging)
     FileUtils.rm_rf(target)
     File.rename(staging, target)
     puts "[devdocs] (#{i + 1}/#{todo.length}) #{label} OK"
