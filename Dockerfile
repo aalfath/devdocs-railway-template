@@ -40,7 +40,7 @@ RUN set -eux; \
 COPY prepare.rb start.sh /devdocs/selfhost/
 RUN chmod +x /devdocs/selfhost/start.sh && thor assets:compile
 
-# Downloaded documentation sets live on the Railway volume.
-VOLUME /devdocs/public/docs
+# Downloaded documentation sets live in /devdocs/public/docs (a Railway volume;
+# Railway rejects the Dockerfile VOLUME instruction).
 EXPOSE 9292
 CMD ["/devdocs/selfhost/start.sh"]
