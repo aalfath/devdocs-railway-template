@@ -15,6 +15,7 @@ require 'docs'
 require 'fileutils'
 
 DEFAULT_DOCS = 'css dom html http javascript'
+DOWNLOADS_URL = ENV.fetch('DEVDOCS_DOWNLOADS_URL', 'https://downloads.devdocs.io').chomp('/')
 store = Docs.store_path
 FileUtils.mkdir_p(store)
 
@@ -51,7 +52,7 @@ todo.each_with_index do |doc, i|
   staging = "#{target}.part"
   archive = nil
   begin
-    archive = Docs::Archive.download("https://downloads.devdocs.io/#{doc.path}.tar.gz")
+    archive = Docs::Archive.download("#{DOWNLOADS_URL}/#{doc.path}.tar.gz")
     Docs::Archive.unpack(archive, staging)
     FileUtils.rm_rf(target)
     File.rename(staging, target)
