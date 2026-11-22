@@ -70,7 +70,24 @@ FileUtils.touch(stamp) if failed.zero? && (refresh || !File.exist?(stamp))
 # Loading the app regenerates public/docs/docs.json from what is installed;
 # docs.js embeds that catalog, so recompile it before Puma starts.
 require 'app'
-Sprockets::Manifest.new(App.sprockets.index, App.assets_manifest_path).compile('docs.js')
-count = JSON.parse(File.read(App.docs_manifest_path)).length
-puts "[devdocs] #{count} documentation set(s) installed; #{failed} download(s) failed"
+catalog = JSON.parse(File.read(App.docs_manifest_path))
+count = catalog.length
 abort '[devdocs] no documentation installed' if count.zero?
+
+# A new browser enables the sets named in DEVDOCS_DOCS (upstream's fixed default
+# list would leave nothing enabled when other sets are installed).
+installed_slugs = catalog.map { |doc| doc['slug'] }
+wanted_all = names.map(&:downcase) == ['all']
+defaults = (wanted_all ? DEFAULT_DOCS.split : wanted.map(&:slug)) & installed_slugs
+defaults = installed_slugs.first(20) if defaults.empty?
+App.set :default_docs, defaults
+
+# config.js embeds the defaults and a timestamp, so compile it only when the
+# defaults change (the stamp lives in the image, so a new deploy recompiles).
+assets = ['docs.js']
+defaults_stamp = File.join(App.assets_path, '.selfhost-default-docs')
+assets << 'app/config.js' unless File.exist?(defaults_stamp) && File.read(defaults_stamp) == defaults.join(' ')
+Sprockets::Manifest.new(App.sprockets.index, App.assets_manifest_path).compile(*assets)
+File.write(defaults_stamp, defaults.join(' '))
+puts "[devdocs] enabled by default for new visitors: #{defaults.join(' ')}"
+puts "[devdocs] #{count} documentation set(s) installed; #{failed} download(s) failed"
