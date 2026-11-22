@@ -42,7 +42,12 @@ stamp = File.join(store, '.last-refresh')
 refresh_days = Integer(ENV.fetch('DEVDOCS_REFRESH_DAYS', '30'), exception: false) || 30
 refresh = refresh_days.positive? && File.exist?(stamp) && File.mtime(stamp) < Time.now - refresh_days * 86_400
 
-todo = refresh ? (wanted + Docs.installed).uniq : wanted.reject(&installed)
+todo = if refresh
+  # Skip sets already refreshed in this cycle (by the boot run, before the background run).
+  (wanted + Docs.installed).uniq.reject { |doc| installed.(doc) && File.mtime(File.join(store, doc.path)) > File.mtime(stamp) }
+else
+  wanted.reject(&installed)
+end
 puts "[devdocs] #{wanted.length} wanted, #{todo.length} to download#{' (monthly refresh)' if refresh}"
 
 require 'open3'
@@ -58,8 +63,20 @@ def unpack(archive, target)
   raise "bsdtar exited #{status.exitstatus}: #{out.lines.first(3).join.strip}"
 end
 
+# On boot, downloads stop after DEVDOCS_BOOT_BUDGET seconds so Railway's health
+# check passes; start.sh then fetches the rest in the background (--background).
+background = ARGV.include?('--background')
+budget = background ? nil : (Integer(ENV.fetch('DEVDOCS_BOOT_BUDGET', '180'), exception: false) || 180)
+deadline = budget && Time.now + budget
+pending = 0
+
 failed = 0
 todo.each_with_index do |doc, i|
+  if deadline && Time.now > deadline
+    pending = todo.length - i
+    puts "[devdocs] boot budget of #{budget}s used; #{pending} set(s) will download in the background"
+    break
+  end
   label = "#{doc.name}#{" #{doc.version}" if doc.version.present?}"
   target = File.join(store, doc.path)
   staging = "#{target}.part"
@@ -80,7 +97,8 @@ todo.each_with_index do |doc, i|
 end
 # Sets that failed are retried on the next boot only if they aren't installed yet;
 # a refresh is attempted at most once per DEVDOCS_REFRESH_DAYS.
-FileUtils.touch(stamp) if refresh || !File.exist?(stamp)
+FileUtils.touch(stamp) if pending.zero? && (refresh || !File.exist?(stamp))
+File.write(File.join(store, '.pending'), pending.to_s)
 
 # Loading the app regenerates public/docs/docs.json from what is installed;
 # docs.js embeds that catalog, so recompile it before Puma starts.
