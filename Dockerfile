@@ -18,7 +18,7 @@ RUN set -eux; \
     git init -q .; \
     git fetch -q --depth 1 https://github.com/freeCodeCamp/devdocs.git "$DEVDOCS_COMMIT"; \
     git checkout -q FETCH_HEAD; \
-    rm -r .git test; \
+    rm -r .git test lib/tasks/console.thor lib/tasks/test.thor; \
     gem install bundler --no-document; \
     bundle config set path.system true; \
     bundle install --jobs 2; \
