@@ -72,7 +72,7 @@ pending = 0
 
 failed = 0
 todo.each_with_index do |doc, i|
-  if deadline && Time.now > deadline
+  if deadline && i.positive? && Time.now > deadline
     pending = todo.length - i
     puts "[devdocs] boot budget of #{budget}s used; #{pending} set(s) will download in the background"
     break
