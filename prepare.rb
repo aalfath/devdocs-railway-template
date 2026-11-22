@@ -78,7 +78,9 @@ todo.each_with_index do |doc, i|
     FileUtils.rm_f(archive) if archive
   end
 end
-FileUtils.touch(stamp) if failed.zero? && (refresh || !File.exist?(stamp))
+# Sets that failed are retried on the next boot only if they aren't installed yet;
+# a refresh is attempted at most once per DEVDOCS_REFRESH_DAYS.
+FileUtils.touch(stamp) if refresh || !File.exist?(stamp)
 
 # Loading the app regenerates public/docs/docs.json from what is installed;
 # docs.js embeds that catalog, so recompile it before Puma starts.
